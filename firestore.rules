@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. Validation Blueprints
+    function isValidUser(data) {
+      return data.keys().hasAll(['displayName', 'createdAt']) &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.createdAt == request.time;
+    }
+
+    function isValidWorkout(data) {
+      return data.keys().hasAll(['userId', 'title', 'date', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 100 &&
+             data.date is timestamp &&
+             data.createdAt == request.time;
+    }
+
+    function isValidExercise(data) {
+      return data.keys().hasAll(['userId', 'workoutId', 'name', 'sets', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.workoutId is string &&
+             data.name is string && data.name.size() <= 100 &&
+             data.sets is list && data.sets.size() <= 50 &&
+             data.createdAt == request.time;
+    }
+
+    function isValidHealthProfile(data) {
+      return data.keys().hasAll(['userId', 'age', 'weight', 'height', 'goals', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.age is number && data.age >= 0 && data.age < 150 &&
+             data.weight is number && data.height is number &&
+             data.goals is string && data.goals.size() <= 1000 &&
+             data.createdAt == request.time;
+    }
+
+    function isValidUserSettings(data) {
+      return data.keys().hasAll(['userId', 'unitSystem']) &&
+             data.userId == request.auth.uid &&
+             data.unitSystem in ['metric', 'imperial'];
+    }
+
+    // 1. Master Gates
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid; // Unlikely to list users, but safe
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && 
+                      isValidUser(incoming()) && 
+                      incoming().createdAt == existing().createdAt &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
+    }
+
+    match /workouts/{workoutId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidWorkout(incoming()) && isValidId(workoutId);
+      allow update: if isSignedIn() && 
+                      existing().userId == request.auth.uid &&
+                      isValidWorkout(incoming()) &&
+                      incoming().userId == existing().userId &&
+                      incoming().createdAt == existing().createdAt &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'duration', 'notes', 'updatedAt']);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /exercises/{exerciseId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && 
+                      isValidExercise(incoming()) && 
+                      isValidId(exerciseId) &&
+                      get(/databases/$(database)/documents/workouts/$(incoming().workoutId)).data.userId == request.auth.uid;
+      allow update: if isSignedIn() && 
+                      existing().userId == request.auth.uid &&
+                      isValidExercise(incoming()) &&
+                      incoming().userId == existing().userId &&
+                      incoming().workoutId == existing().workoutId &&
+                      incoming().createdAt == existing().createdAt;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /healthProfiles/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidHealthProfile(incoming());
+      allow update: if isOwner(userId) && 
+                      isValidHealthProfile(incoming()) && 
+                      incoming().createdAt == existing().createdAt &&
+                      incoming().diff(existing()).affectedKeys().hasOnly([
+                        'age', 'weight', 'height', 'gender', 'injuries', 
+                        'goals', 'equipment', 'trainingReminder', 'reminderTime', 'updatedAt'
+                      ]);
+    }
+
+    match /settings/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserSettings(incoming());
+      allow update: if isOwner(userId) && 
+                      isValidUserSettings(incoming()) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['unitSystem', 'notificationsEnabled', 'updatedAt']);
+    }
+  }
+}

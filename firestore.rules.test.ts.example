@@ -1,0 +1,87 @@
+import { 
+  initializeTestEnvironment, 
+  RulesTestEnvironment, 
+  assertFails, 
+  assertSucceeds 
+} from '@firebase/rules-unit-testing';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import * as fs from 'fs';
+
+/**
+ * FitPulse Security Rules Test Suite
+ * This file verifies the "Dirty Dozen" payloads against the security rules.
+ * Requires Firebase Emulator Suite to run locally.
+ */
+
+describe('FitPulse Security Rules', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'silken-hold-ncf5x',
+      firestore: {
+        rules: fs.readFileSync('firestore.rules', 'utf8'),
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  test('Identity Spoofing: Deny creating workout for another user', async () => {
+    const context = testEnv.authenticatedContext('user_1');
+    const db = context.firestore();
+    const workoutRef = doc(db, 'workouts/workout_1');
+    
+    await assertFails(setDoc(workoutRef, {
+      userId: 'user_2', // Spoofed ID
+      title: 'Workout',
+      date: new Date(),
+      createdAt: new Date()
+    }));
+  });
+
+  test('Resource Poisoning: Deny huge title', async () => {
+    const context = testEnv.authenticatedContext('user_1');
+    const db = context.firestore();
+    const workoutRef = doc(db, 'workouts/workout_1');
+    
+    await assertFails(setDoc(workoutRef, {
+      userId: 'user_1',
+      title: 'a'.repeat(1000), // Too long
+      date: new Date(),
+      createdAt: new Date()
+    }));
+  });
+
+  test('Foreign Update: Deny User A editing User B workout', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'workouts/workout_B'), {
+        userId: 'user_B',
+        title: 'B Workout',
+        date: new Date(),
+        createdAt: new Date()
+      });
+    });
+
+    const context = testEnv.authenticatedContext('user_A');
+    const db = context.firestore();
+    await assertFails(updateDoc(doc(db, 'workouts/workout_B'), {
+      title: 'New Title'
+    }));
+  });
+
+  test('Timeline Tampering: Deny manual future createdAt', async () => {
+    const context = testEnv.authenticatedContext('user_1');
+    const db = context.firestore();
+    // Rule: createdAt == request.time
+    await assertFails(setDoc(doc(db, 'workouts/workout_1'), {
+      userId: 'user_1',
+      title: 'Workout',
+      date: new Date(),
+      createdAt: new Date(Date.now() + 100000) 
+    }));
+  });
+});

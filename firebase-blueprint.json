@@ -1,0 +1,107 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile data including fitness goals and basic stats.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["displayName", "createdAt"]
+    },
+    "Workout": {
+      "title": "Workout Session",
+      "description": "A single workout session recorded by the user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "duration": { "type": "number", "description": "Duration in minutes" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "date", "createdAt"]
+    },
+    "Exercise": {
+      "title": "Exercise Entry",
+      "description": "A specific exercise performed during a workout session.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "workoutId": { "type": "string" },
+        "name": { "type": "string" },
+        "sets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reps": { "type": "number" },
+              "weight": { "type": "number" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "workoutId", "name", "sets", "createdAt"]
+    },
+    "HealthProfile": {
+      "title": "Health Profile",
+      "description": "User's health data and training preferences for the virtual trainer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "age": { "type": "number" },
+        "weight": { "type": "number" },
+        "height": { "type": "number" },
+        "gender": { "type": "string" },
+        "injuries": { "type": "string" },
+        "goals": { "type": "string" },
+        "equipment": { "type": "string" },
+        "trainingReminder": { "type": "boolean" },
+        "reminderTime": { "type": "string", "description": "HH:mm format" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "age", "weight", "height", "goals", "createdAt"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "User preferences for units and notifications.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "unitSystem": { "type": "string", "enum": ["metric", "imperial"] },
+        "notificationsEnabled": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "unitSystem"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Information about the application users."
+    },
+    "workouts/{workoutId}": {
+      "schema": "Workout",
+      "description": "Workouts logged by users."
+    },
+    "exercises/{exerciseId}": {
+      "schema": "Exercise",
+      "description": "Exercises associated with specific workouts."
+    },
+    "healthProfiles/{userId}": {
+      "schema": "HealthProfile",
+      "description": "Health data for individual users."
+    },
+    "settings/{userId}": {
+      "schema": "UserSettings",
+      "description": "Preferences for individual users."
+    }
+  }
+}
