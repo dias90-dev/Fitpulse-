@@ -29,6 +29,32 @@ export interface Exercise {
   createdAt: any;
 }
 
+export interface Routine {
+  id?: string;
+  userId: string;
+  name: string;
+  description?: string;
+  exercises: Array<{
+    name: string;
+    sets: Array<{
+      reps: number;
+      weight: number;
+    }>;
+  }>;
+  createdAt: any;
+  updatedAt?: any;
+}
+
+export interface MediaExercise {
+  id?: string;
+  userId: string;
+  title: string;
+  description: string;
+  mediaUrl: string;
+  mediaType: 'video' | 'image';
+  createdAt: any;
+}
+
 export interface HealthProfile {
   userId: string;
   age: number;

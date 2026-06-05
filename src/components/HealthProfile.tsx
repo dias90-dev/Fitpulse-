@@ -93,15 +93,15 @@ export function HealthProfileForm() {
             <label className="text-sm font-medium text-gray-400">Idade</label>
             <input 
               type="number"
-              value={profile.age}
-              onChange={(e) => setProfile({...profile, age: parseInt(e.target.value)})}
+              value={profile.age || ''}
+              onChange={(e) => setProfile({...profile, age: parseInt(e.target.value) || 0})}
               className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-400">Gênero</label>
             <select 
-              value={profile.gender}
+              value={profile.gender || 'Masculino'}
               onChange={(e) => setProfile({...profile, gender: e.target.value})}
               className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none"
             >
@@ -115,8 +115,8 @@ export function HealthProfileForm() {
             <label className="text-sm font-medium text-gray-400">Peso (kg)</label>
             <input 
               type="number"
-              value={profile.weight}
-              onChange={(e) => setProfile({...profile, weight: parseFloat(e.target.value)})}
+              value={profile.weight || ''}
+              onChange={(e) => setProfile({...profile, weight: parseFloat(e.target.value) || 0})}
               className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
@@ -124,8 +124,8 @@ export function HealthProfileForm() {
             <label className="text-sm font-medium text-gray-400">Altura (cm)</label>
             <input 
               type="number"
-              value={profile.height}
-              onChange={(e) => setProfile({...profile, height: parseInt(e.target.value)})}
+              value={profile.height || ''}
+              onChange={(e) => setProfile({...profile, height: parseInt(e.target.value) || 0})}
               className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>

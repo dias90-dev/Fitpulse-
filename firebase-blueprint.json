@@ -69,6 +69,19 @@
       },
       "required": ["userId", "age", "weight", "height", "goals", "createdAt"]
     },
+    "HydrationLog": {
+      "title": "Hydration Log",
+      "description": "Daily hydration tracking.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "glasses": { "type": "number" },
+        "goal": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date", "glasses", "goal"]
+    },
     "UserSettings": {
       "title": "User Settings",
       "description": "User preferences for units and notifications.",
@@ -98,6 +111,10 @@
     "healthProfiles/{userId}": {
       "schema": "HealthProfile",
       "description": "Health data for individual users."
+    },
+    "hydrationLogs/{logId}": {
+      "schema": "HydrationLog",
+      "description": "Daily hydration logs."
     },
     "settings/{userId}": {
       "schema": "UserSettings",

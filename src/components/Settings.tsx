@@ -1,6 +1,6 @@
 import React from 'react';
 import { db, auth } from '../firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Settings as SettingsIcon, Bell, Ruler, Save, CheckCircle2, Shield, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -57,11 +57,22 @@ export function Settings() {
     setMessage(null);
 
     try {
-      await setDoc(doc(db, 'settings', user.uid), {
-        ...settings,
-        userId: user.uid,
-        updatedAt: serverTimestamp()
-      });
+      const docRef = doc(db, 'settings', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        await updateDoc(docRef, {
+          unitSystem: settings.unitSystem,
+          notificationsEnabled: settings.notificationsEnabled,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await setDoc(docRef, {
+          userId: user.uid,
+          unitSystem: settings.unitSystem,
+          notificationsEnabled: settings.notificationsEnabled,
+          updatedAt: serverTimestamp()
+        });
+      }
       setMessage('Preferências salvas com sucesso!');
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {

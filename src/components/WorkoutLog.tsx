@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, Timestamp, query, where, getDocs } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { X, Plus, Trash2, Save, Dumbbell } from 'lucide-react';
+import { X, Plus, Trash2, Save, Dumbbell, ClipboardList } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Exercise, OperationType } from '../types';
+import { Exercise, OperationType, Routine } from '../types';
 import { handleFirestoreError } from '../lib/firestore-utils';
 
 interface WorkoutLogModalProps {
@@ -13,14 +13,48 @@ interface WorkoutLogModalProps {
 
 export function WorkoutLogModal({ onClose }: WorkoutLogModalProps) {
   const [user] = useAuthState(auth);
-  const [title, setTitle] = React.useState('');
-  const [date, setDate] = React.useState(new Date().toISOString().split('T')[0]);
-  const [duration, setDuration] = React.useState('');
-  const [notes, setNotes] = React.useState('');
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [duration, setDuration] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+
+  // Routines / Templates
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  
+  useEffect(() => {
+    if (!user) return;
+    const fetchRoutines = async () => {
+      try {
+        const q = query(collection(db, 'routines'), where('userId', '==', user.uid));
+        const snap = await getDocs(q);
+        const fetchedRoutines = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Routine));
+        setRoutines(fetchedRoutines);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchRoutines();
+  }, [user]);
+
+  const handleApplyRoutine = (routineId: string) => {
+    if (!routineId) return;
+    const routine = routines.find(r => r.id === routineId);
+    if (!routine) return;
+    
+    setTitle(routine.name);
+    setNotes(routine.description || '');
+    if (routine.exercises && routine.exercises.length > 0) {
+      setExercises(routine.exercises.map(ex => ({
+        name: ex.name,
+        sets: ex.sets.map(s => ({ reps: s.reps, weight: s.weight }))
+      })));
+    }
+  };
 
   // Exercise handling
-  const [exercises, setExercises] = React.useState<Partial<Exercise>[]>([
+  const [exercises, setExercises] = useState<Partial<Exercise>[]>([
     { name: '', sets: [{ reps: 0, weight: 0 }] }
   ]);
 
@@ -71,6 +105,7 @@ export function WorkoutLogModal({ onClose }: WorkoutLogModalProps) {
 
       // Add exercises
       const exercisePath = 'exercises';
+      const addedExercises = [];
       for (const ex of exercises) {
         if (ex.name) {
           await addDoc(collection(db, exercisePath), {
@@ -80,7 +115,19 @@ export function WorkoutLogModal({ onClose }: WorkoutLogModalProps) {
             sets: ex.sets,
             createdAt: serverTimestamp(),
           });
+          addedExercises.push(ex);
         }
+      }
+
+      if (saveAsTemplate && addedExercises.length > 0) {
+        await addDoc(collection(db, 'routines'), {
+          userId: user.uid,
+          name: title,
+          description: notes,
+          exercises: addedExercises,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
       }
 
       onClose();
@@ -111,6 +158,25 @@ export function WorkoutLogModal({ onClose }: WorkoutLogModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
+          
+          {routines.length > 0 && (
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-center gap-4">
+              <ClipboardList size={24} className="text-blue-500" />
+              <div className="flex-1">
+                <label className="text-sm font-bold text-blue-400 mb-1 block">Carregar de um Template</label>
+                <select 
+                  onChange={(e) => handleApplyRoutine(e.target.value)}
+                  className="w-full bg-[#151619] border border-blue-500/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none text-gray-300"
+                >
+                  <option value="">Selecione um template salvo...</option>
+                  {routines.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* General Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -205,14 +271,14 @@ export function WorkoutLogModal({ onClose }: WorkoutLogModalProps) {
                           </div>
                           <input 
                             type="number"
-                            value={set.weight}
-                            onChange={(e) => updateSet(exIdx, setIdx, 'weight', parseFloat(e.target.value))}
+                            value={set.weight || ''}
+                            onChange={(e) => updateSet(exIdx, setIdx, 'weight', parseFloat(e.target.value) || 0)}
                             className="bg-gray-800 border border-gray-700/50 rounded-lg py-2 px-2 text-center font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                           />
                           <input 
                             type="number"
-                            value={set.reps}
-                            onChange={(e) => updateSet(exIdx, setIdx, 'reps', parseInt(e.target.value))}
+                            value={set.reps || ''}
+                            onChange={(e) => updateSet(exIdx, setIdx, 'reps', parseInt(e.target.value) || 0)}
                             className="bg-gray-800 border border-gray-700/50 rounded-lg py-2 px-2 text-center font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                           />
                           <button 
@@ -243,28 +309,39 @@ export function WorkoutLogModal({ onClose }: WorkoutLogModalProps) {
           </div>
         </form>
 
-        <div className="p-6 border-t border-gray-800 flex justify-end gap-3">
-          <button 
-            type="button"
-            onClick={onClose}
-            className="px-6 py-2.5 rounded-xl font-bold bg-gray-800 hover:bg-gray-700 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button 
-            onClick={handleSubmit}
-            disabled={!title || isSubmitting}
-            className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-white shadow-lg shadow-blue-600/20 transition-all"
-          >
-            {isSubmitting ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            ) : (
-              <>
-                <Save size={18} />
-                <span>Salvar Treino</span>
-              </>
-            )}
-          </button>
+        <div className="p-6 border-t border-gray-800 flex items-center justify-between gap-3">
+          <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-300">
+            <input 
+              type="checkbox" 
+              checked={saveAsTemplate}
+              onChange={(e) => setSaveAsTemplate(e.target.checked)}
+              className="rounded border-gray-700 bg-gray-900 text-blue-500 focus:ring-blue-500 w-4 h-4"
+            />
+            <span>Salvar como Template</span>
+          </label>
+          <div className="flex items-center gap-3">
+            <button 
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-xl font-bold bg-gray-800 hover:bg-gray-700 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={handleSubmit}
+              disabled={!title || isSubmitting}
+              className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-white shadow-lg shadow-blue-600/20 transition-all"
+            >
+              {isSubmitting ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <Save size={18} />
+                  <span>Salvar Treino</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>

@@ -66,6 +66,14 @@ service cloud.firestore {
              data.unitSystem in ['metric', 'imperial'];
     }
 
+    function isValidHydrationLog(data) {
+      return data.keys().hasAll(['userId', 'date', 'glasses', 'goal']) &&
+             data.userId == request.auth.uid &&
+             data.date is string &&
+             data.glasses is number && data.glasses >= 0 &&
+             data.goal is number && data.goal >= 1;
+    }
+
     // 1. Master Gates
     match /users/{userId} {
       allow get: if isSignedIn();
@@ -77,8 +85,18 @@ service cloud.firestore {
                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
     }
 
+    match /routines/{routineId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && 
+                      existing().userId == request.auth.uid &&
+                      incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+    }
+
     match /workouts/{workoutId} {
-      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && isValidWorkout(incoming()) && isValidId(workoutId);
       allow update: if isSignedIn() && 
@@ -87,11 +105,11 @@ service cloud.firestore {
                       incoming().userId == existing().userId &&
                       incoming().createdAt == existing().createdAt &&
                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'duration', 'notes', 'updatedAt']);
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
     }
 
     match /exercises/{exerciseId} {
-      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && 
                       isValidExercise(incoming()) && 
@@ -103,7 +121,7 @@ service cloud.firestore {
                       incoming().userId == existing().userId &&
                       incoming().workoutId == existing().workoutId &&
                       incoming().createdAt == existing().createdAt;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
     }
 
     match /healthProfiles/{userId} {
@@ -121,9 +139,20 @@ service cloud.firestore {
     match /settings/{userId} {
       allow get: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUserSettings(incoming());
-      allow update: if isOwner(userId) && 
-                      isValidUserSettings(incoming()) &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['unitSystem', 'notificationsEnabled', 'updatedAt']);
+      allow update: if isOwner(userId) && isValidUserSettings(incoming());
+    }
+
+    match /hydrationLogs/{logId} {
+      allow read: if isSignedIn() && logId.split('_')[0] == request.auth.uid;
+      allow write: if isSignedIn() && logId.split('_')[0] == request.auth.uid;
+    }
+
+    match /mediaExercises/{exerciseId} {
+      allow read: if isSignedIn(); // Allow anyone to read, or maybe just list their own
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
   }
 }

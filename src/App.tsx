@@ -8,7 +8,8 @@ import { VirtualTrainer } from './components/VirtualTrainer';
 import { WorkoutHistory } from './components/History';
 import { Settings } from './components/Settings';
 import { LandingPage } from './components/Landing';
-import { Activity, LayoutDashboard, Sparkles, UserPlus, History, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { VideoTraining } from './components/VideoTraining';
+import { Activity, LayoutDashboard, Sparkles, UserPlus, History, LogOut, Settings as SettingsIcon, PlaySquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { signOut } from 'firebase/auth';
 
@@ -20,6 +21,7 @@ export default function App() {
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
       case 'trainer': return <VirtualTrainer />;
+      case 'videos': return <VideoTraining />;
       case 'history': return <WorkoutHistory />;
       case 'health': return <HealthProfileForm />;
       case 'settings': return <Settings />;
@@ -60,7 +62,8 @@ export default function App() {
           <div className="hidden md:flex items-center gap-1 bg-gray-900/50 p-1 rounded-xl border border-gray-800">
             <TabButton icon={<LayoutDashboard size={18} />} label="Início" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
             <TabButton icon={<Sparkles size={18} />} label="Trainer" active={activeTab === 'trainer'} onClick={() => setActiveTab('trainer')} />
-            <TabButton icon={<History size={18} />} label="História" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
+            <TabButton icon={<PlaySquare size={18} />} label="Vídeos" active={activeTab === 'videos'} onClick={() => setActiveTab('videos')} />
+            <TabButton icon={<History size={18} />} label="Histórico" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
             <TabButton icon={<UserPlus size={18} />} label="Saúde" active={activeTab === 'health'} onClick={() => setActiveTab('health')} />
           </div>
 
@@ -102,12 +105,12 @@ export default function App() {
       </main>
 
       {/* Mobile Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 border-t border-gray-800 bg-[#0A0A0B]/80 backdrop-blur-md z-40 md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 h-16 border-t border-gray-800 bg-[#0A0A0B]/80 backdrop-blur-md z-40 md:hidden pb-safe">
         <div className="flex items-center justify-around h-full">
           <NavIcon icon={<LayoutDashboard />} label="Início" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <NavIcon icon={<Sparkles />} label="Trainer" active={activeTab === 'trainer'} onClick={() => setActiveTab('trainer')} />
-          <NavIcon icon={<History />} label="História" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
-          <NavIcon icon={<SettingsIcon />} label="Ajustes" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+          <NavIcon icon={<PlaySquare />} label="Vídeos" active={activeTab === 'videos'} onClick={() => setActiveTab('videos')} />
+          <NavIcon icon={<History />} label="Histórico" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
           <NavIcon icon={<UserPlus />} label="Saúde" active={activeTab === 'health'} onClick={() => setActiveTab('health')} />
         </div>
       </nav>

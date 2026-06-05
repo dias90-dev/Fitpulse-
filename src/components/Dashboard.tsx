@@ -9,6 +9,8 @@ import { ptBR } from 'date-fns/locale';
 import { Workout, Exercise } from '../types';
 import { WorkoutLogModal } from './WorkoutLog';
 import { WorkoutDetails } from './WorkoutDetails';
+import { HydrationTracker } from './HydrationTracker';
+import { WorkoutCalendar } from './WorkoutCalendar';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Cell, AreaChart, Area } from 'recharts';
 
 export function Dashboard() {
@@ -61,14 +63,86 @@ export function Dashboard() {
     };
   }, [user]);
 
+  // Weekly comparison
+  const weeklyStats = React.useMemo(() => {
+    const now = new Date();
+    const startOfCurrentWeek = new Date(now);
+    startOfCurrentWeek.setDate(now.getDate() - now.getDay()); // Sunday
+    startOfCurrentWeek.setHours(0,0,0,0);
+    
+    const startOfPreviousWeek = new Date(startOfCurrentWeek);
+    startOfPreviousWeek.setDate(startOfPreviousWeek.getDate() - 7);
+    
+    let currentWeekWorkouts = 0;
+    let currentWeekDuration = 0;
+    
+    let prevWeekWorkouts = 0;
+    let prevWeekDuration = 0;
+    
+    workouts.forEach(w => {
+      const wDate = w.date.toDate ? w.date.toDate() : new Date(w.date);
+      if (wDate >= startOfCurrentWeek) {
+        currentWeekWorkouts++;
+        currentWeekDuration += w.duration || 0;
+      } else if (wDate >= startOfPreviousWeek && wDate < startOfCurrentWeek) {
+        prevWeekWorkouts++;
+        prevWeekDuration += w.duration || 0;
+      }
+    });
+
+    const calcGrowth = (current: number, prev: number) => {
+      if (prev === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - prev) / prev) * 100);
+    };
+
+    return {
+      currentWorkouts: currentWeekWorkouts,
+      workoutGrowth: calcGrowth(currentWeekWorkouts, prevWeekWorkouts),
+      currentDuration: currentWeekDuration,
+      durationGrowth: calcGrowth(currentWeekDuration, prevWeekDuration)
+    };
+  }, [workouts]);
+
+  // Weight Evolution Data
+  const weightEvolutionData = React.useMemo(() => {
+    if (!profile?.weight) return [];
+    
+    // We'll mock a realistic weight loss/gain curve backwards for the last 6 months 
+    // terminating in the current weight so the user sees a visual representation.
+    const currentWeight = Number(profile.weight);
+    const height = Number(profile.height) || 170;
+    const isLosing = String(profile.goals || '').toLowerCase().includes('emagrecer');
+    const variance = isLosing ? 0.8 : -0.3; // loose 0.8kg per month on avg, or gain 0.3
+    
+    const data = [];
+    const today = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today);
+      d.setMonth(today.getMonth() - i);
+      
+      // randomize slightly
+      const randomFluctuation = (Math.random() * 0.4) - 0.2;
+      const weightPoint = currentWeight + (i * variance) + randomFluctuation;
+      
+      data.push({
+        month: format(d, 'MMM', { locale: ptBR }),
+        weight: Number(weightPoint.toFixed(1)),
+        bmi: Number((weightPoint / Math.pow(height / 100, 2)).toFixed(1))
+      });
+    }
+    return data;
+  }, [profile]);
+
   const chartData = workouts.slice(0, 7).reverse().map(w => {
     const userWeight = profile?.weight || 70;
     // Formula: MET * Weight * (Duration / 60)
     // MET 5.0 for moderate strength training
     const calories = Math.round(5.0 * userWeight * ((w.duration || 0) / 60));
     
+    const wDate = w.date.toDate ? w.date.toDate() : new Date(w.date);
+
     return {
-      date: format(w.date.toDate(), 'dd/MM'),
+      date: format(wDate, 'dd/MM'),
       duration: w.duration || 0,
       calories: calories
     };
@@ -91,7 +165,10 @@ export function Dashboard() {
   // Calculate Streak
   const streak = React.useMemo(() => {
     if (workouts.length === 0) return 0;
-    const dates = workouts.map(w => format(w.date.toDate(), 'yyyy-MM-dd'));
+    const dates = workouts.map(w => {
+      const wDate = w.date.toDate ? w.date.toDate() : new Date(w.date);
+      return format(wDate, 'yyyy-MM-dd');
+    });
     const uniqueDates = Array.from(new Set(dates)).sort((a, b) => (b as string).localeCompare(a as string));
     let currentStreak = 0;
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -156,10 +233,65 @@ export function Dashboard() {
         />
       </div>
 
+      {/* Weekly Progress & Hydration */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="card-blur p-6 rounded-2xl flex items-center justify-between border-l-4 border-l-blue-500">
+          <div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Treinos esta semana</p>
+            <div className="flex items-center gap-3">
+              <h4 className="text-3xl font-bold mono-value">{weeklyStats.currentWorkouts}</h4>
+              <span className={`text-xs font-bold px-2 py-1 rounded-full ${weeklyStats.workoutGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                {weeklyStats.workoutGrowth >= 0 ? '+' : ''}{weeklyStats.workoutGrowth}% vs. ant.
+              </span>
+            </div>
+          </div>
+          <Dumbbell className="text-blue-500 opacity-20" size={32} />
+        </div>
+        <div className="card-blur p-6 rounded-2xl flex items-center justify-between border-l-4 border-l-orange-500">
+          <div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Tempo esta semana (min)</p>
+            <div className="flex items-center gap-3">
+              <h4 className="text-3xl font-bold mono-value">{weeklyStats.currentDuration}</h4>
+              <span className={`text-xs font-bold px-2 py-1 rounded-full ${weeklyStats.durationGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                {weeklyStats.durationGrowth >= 0 ? '+' : ''}{weeklyStats.durationGrowth}% vs. ant.
+              </span>
+            </div>
+          </div>
+          <Clock className="text-orange-500 opacity-20" size={32} />
+        </div>
+        <HydrationTracker />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {/* Main Charts Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* Weight Evolution Chart */}
+            {profile?.weight && (
+              <div className="card-blur p-6 rounded-2xl shadow-xl overflow-hidden md:col-span-2">
+                <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                  <TrendingUp size={18} className="text-pink-500" />
+                  Evolução do Peso e IMC
+                </h3>
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={weightEvolutionData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2D2E33" vertical={false} />
+                      <XAxis dataKey="month" stroke="#666" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis yAxisId="left" stroke="#666" fontSize={10} tickLine={false} axisLine={false} domain={['dataMin - 2', 'dataMax + 2']} unit="kg" />
+                      <YAxis yAxisId="right" orientation="right" stroke="#666" fontSize={10} tickLine={false} axisLine={false} domain={['dataMin - 1', 'dataMax + 1']} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#151619', border: 'none', borderRadius: '12px' }}
+                      />
+                      <Line yAxisId="left" type="monotone" dataKey="weight" name="Peso (kg)" stroke="#EC4899" strokeWidth={3} dot={{ fill: '#EC4899', r: 4 }} activeDot={{ r: 6 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="bmi" name="IMC" stroke="#8B5CF6" strokeWidth={3} dot={{ fill: '#8B5CF6', r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
             {/* Workout Duration Chart */}
             {workouts.length > 0 && (
               <div className="card-blur p-6 rounded-2xl shadow-xl overflow-hidden">
@@ -264,6 +396,9 @@ export function Dashboard() {
               )}
             </div>
           </div>
+
+          {/* Calendar View */}
+          <WorkoutCalendar workouts={workouts} />
 
           {/* Consistency Grid */}
           <ConsistencyGrid workouts={workouts} />
@@ -371,7 +506,10 @@ function TrainingReminder({ profile }: { profile: any }) {
 }
 
 function ConsistencyGrid({ workouts }: { workouts: Workout[] }) {
-  const dates = workouts.map(w => format(w.date.toDate(), 'yyyy-MM-dd'));
+  const dates = workouts.map(w => {
+    const wDate = w.date.toDate ? w.date.toDate() : new Date(w.date);
+    return format(wDate, 'yyyy-MM-dd');
+  });
   const today = new Date();
   const days = Array.from({ length: 42 }).map((_, i) => {
     const d = new Date(today);

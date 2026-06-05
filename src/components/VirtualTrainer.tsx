@@ -50,7 +50,7 @@ export function VirtualTrainer() {
         if (docSnap.exists()) {
           const data = docSnap.data() as HealthProfile;
           setProfile(data);
-          setTempWeight(data.weight.toString());
+          setTempWeight(data.weight ? data.weight.toString() : '');
         }
       } catch (err) {
         console.error(err);
